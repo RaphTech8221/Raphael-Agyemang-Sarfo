@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ANNOUNCEMENTS_DATA } from '../constants';
 import { User, SchoolEvent } from '../types';
@@ -10,15 +11,28 @@ interface HeaderProps {
   events: SchoolEvent[];
   reminders: number[];
   setReminders: React.Dispatch<React.SetStateAction<number[]>>;
+  onSave: () => Promise<boolean>;
+  isDirty: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ title, currentUser, onOpenChangePasswordModal, onOpenEditSchoolNameModal, events, reminders, setReminders }) => {
+const Header: React.FC<HeaderProps> = ({ title, currentUser, onOpenChangePasswordModal, onOpenEditSchoolNameModal, events, reminders, setReminders, onSave, isDirty }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(ANNOUNCEMENTS_DATA.length);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDirty && saveStatus === 'saved') {
+      const timer = setTimeout(() => setSaveStatus('idle'), 2000);
+      return () => clearTimeout(timer);
+    } else if (!isDirty) {
+      setSaveStatus('idle');
+    }
+  }, [isDirty, saveStatus]);
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -56,10 +70,58 @@ const Header: React.FC<HeaderProps> = ({ title, currentUser, onOpenChangePasswor
     setReminders(prev => prev.filter(id => id !== eventId));
   };
 
+  const handleSaveClick = async () => {
+    setSaveStatus('saving');
+    const success = await onSave();
+    if (success) {
+      setSaveStatus('saved');
+    } else {
+      setSaveStatus('idle');
+      alert('An error occurred while saving. Please try again.');
+    }
+  };
+
+  const renderSaveButton = () => {
+    if (saveStatus === 'saved') {
+      return (
+        <button disabled className="bg-green-500 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all duration-300 animate-fade-in-sm">
+           <style>{`
+            @keyframes fade-in-sm { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+            .animate-fade-in-sm { animation: fade-in-sm 0.3s ease-out forwards; }
+          `}</style>
+          <i className="fa-solid fa-check mr-2"></i>
+          Saved
+        </button>
+      );
+    }
+  
+    if (!isDirty) {
+      return null;
+    }
+  
+    return (
+      <button
+        onClick={handleSaveClick}
+        disabled={saveStatus === 'saving'}
+        className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all duration-200 disabled:bg-slate-400 disabled:cursor-wait animate-fade-in-sm"
+      >
+        {saveStatus === 'saving' ? (
+          <>
+            <i className="fa-solid fa-spinner fa-spin mr-2"></i>
+            Saving...
+          </>
+        ) : (
+          'Save Changes'
+        )}
+      </button>
+    );
+  };
+
   return (
     <header className="bg-white shadow-sm h-20 flex items-center justify-between px-8">
       <h2 className="text-3xl font-bold text-slate-700">{title}</h2>
       <div className="flex items-center space-x-6">
+          {renderSaveButton()}
           <div className="relative" ref={notificationsRef}>
              <button
                 onClick={handleNotificationsToggle}

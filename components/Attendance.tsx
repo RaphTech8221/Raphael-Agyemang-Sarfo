@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { AttendanceRecord, Teacher } from '../types';
 
@@ -5,93 +6,86 @@ const attendanceStatuses: AttendanceRecord['status'][] = ['Present', 'Absent', '
 
 interface AttendanceProps {
   teachers: Teacher[];
+  allAttendance: Record<string, AttendanceRecord[]>;
+  setAllAttendance: (updater: React.SetStateAction<Record<string, AttendanceRecord[]>>) => void;
 }
 
-const Attendance: React.FC<AttendanceProps> = ({ teachers }) => {
+const Attendance: React.FC<AttendanceProps> = ({ teachers, allAttendance, setAllAttendance }) => {
   const today = new Date().toISOString().split('T')[0];
-  const storageKey = `attendance_${today}`;
-
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
-    try {
-      const savedAttendance = localStorage.getItem(storageKey);
-      if (savedAttendance) {
-        return JSON.parse(savedAttendance);
-      }
-    } catch (error) {
-        console.error("Error parsing attendance from localStorage", error);
-    }
-    
-    return teachers.map(teacher => ({
-      teacherId: teacher.id,
-      teacherName: teacher.name,
-      status: 'Absent' as 'Absent',
-      checkInTime: null,
-      checkOutTime: null,
-    }));
-  });
-
+  
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(attendance));
-  }, [attendance, storageKey]);
+    // This effect ensures that there's an entry for today if one doesn't exist,
+    // and syncs it with the current teacher list.
+    const recordsForDay = allAttendance[today] || [];
+    const attendanceMap = new Map(recordsForDay.map(rec => [rec.teacherId, rec]));
+    const syncedRecords = teachers.map(teacher => 
+        attendanceMap.get(teacher.id) || {
+            teacherId: teacher.id,
+            teacherName: teacher.name,
+            status: 'Absent',
+            checkInTime: null,
+            checkOutTime: null,
+        }
+    ) as AttendanceRecord[];
+    
+    // Only update state if the list for today doesn't exist or is out of sync.
+    if (!allAttendance[today] || JSON.stringify(allAttendance[today]) !== JSON.stringify(syncedRecords)) {
+        setAllAttendance(prevAll => ({ ...prevAll, [today]: syncedRecords }));
+    }
+  }, [today, teachers, allAttendance, setAllAttendance]);
+
+  const attendanceForToday = useMemo(() => allAttendance[today] || [], [allAttendance, today]);
+
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
 
   const handleRefreshList = () => {
-    setAttendance(currentAttendance => {
-        const attendanceMap = new Map<string, AttendanceRecord>();
-        currentAttendance.forEach(record => {
-            attendanceMap.set(record.teacherId, record);
-        });
-
-        const newAttendanceList = teachers.map(teacher => {
-            const existingRecord = attendanceMap.get(teacher.id);
-            if (existingRecord) {
-                return existingRecord; // Keep existing record if teacher is still here
-            }
-            // Add a new record for a newly added teacher
-            return {
-                teacherId: teacher.id,
-                teacherName: teacher.name,
-                status: 'Absent' as 'Absent',
-                checkInTime: null,
-                checkOutTime: null,
-            };
-        });
-        
-        return newAttendanceList;
-    });
+    const recordsForDay = allAttendance[today] || [];
+    const attendanceMap = new Map(recordsForDay.map(rec => [rec.teacherId, rec]));
+    const syncedRecords = teachers.map(teacher => 
+        attendanceMap.get(teacher.id) || {
+            teacherId: teacher.id,
+            teacherName: teacher.name,
+            status: 'Absent',
+            checkInTime: null,
+            checkOutTime: null,
+        }
+    ) as AttendanceRecord[];
+    setAllAttendance(prevAll => ({ ...prevAll, [today]: syncedRecords }));
   };
 
   const handleCheckIn = (teacherId: string) => {
-    setAttendance(prev =>
-      prev.map(record => {
-        if (record.teacherId === teacherId) {
-            const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            return {
-              ...record,
-              status: 'Present',
-              checkInTime: record.checkInTime || now, // Keep original check-in time if re-checking in
-              checkOutTime: null, // Clear checkout time on re-check-in
-            };
-        }
-        return record;
-      })
-    );
+    setAllAttendance(prevAll => {
+        const recordsForDay = (prevAll[today] || []).map(record => {
+          if (record.teacherId === teacherId) {
+              const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+              return {
+                ...record,
+                status: 'Present' as 'Present',
+                checkInTime: record.checkInTime || now,
+                checkOutTime: null,
+              };
+          }
+          return record;
+        });
+        return { ...prevAll, [today]: recordsForDay };
+    });
   };
 
   const handleCheckOut = (teacherId: string) => {
-    setAttendance(prev =>
-      prev.map(record =>
+    setAllAttendance(prevAll => {
+      const recordsForDay = (prevAll[today] || []).map(record =>
         record.teacherId === teacherId
           ? {
               ...record,
-              status: 'Checked Out',
+              status: 'Checked Out' as 'Checked Out',
               checkOutTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
             }
           : record
-      )
-    );
+      );
+      return { ...prevAll, [today]: recordsForDay };
+    });
   };
   
   const resetFilters = () => {
@@ -99,12 +93,12 @@ const Attendance: React.FC<AttendanceProps> = ({ teachers }) => {
     setSelectedStatus('');
   };
 
-  const filteredAttendance = useMemo(() => attendance.filter(record => {
+  const filteredAttendance = useMemo(() => attendanceForToday.filter(record => {
     const searchMatch = record.teacherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         record.teacherId.toLowerCase().includes(searchTerm.toLowerCase());
     const statusMatch = selectedStatus ? record.status === selectedStatus : true;
     return searchMatch && statusMatch;
-  }), [attendance, searchTerm, selectedStatus]);
+  }), [attendanceForToday, searchTerm, selectedStatus]);
 
   const getStatusBadge = (status: AttendanceRecord['status']) => {
     switch (status) {
@@ -120,13 +114,13 @@ const Attendance: React.FC<AttendanceProps> = ({ teachers }) => {
   };
 
   const attendanceSummary = useMemo(() => {
-    return attendance.reduce((acc, record) => {
+    return attendanceForToday.reduce((acc, record) => {
         if (record.status === 'Present') acc.Present++;
         else if (record.status === 'Absent') acc.Absent++;
         else if (record.status === 'Checked Out') acc.CheckedOut++;
         return acc;
     }, { Present: 0, Absent: 0, CheckedOut: 0 });
-  }, [attendance]);
+  }, [attendanceForToday]);
 
 
   return (

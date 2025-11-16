@@ -13,7 +13,7 @@ import LessonPlanner from './components/LessonPlanner';
 import Login from './components/Login';
 import TeacherDashboard from './components/TeacherDashboard';
 import StudentDashboard from './components/StudentDashboard';
-import { View, User, Student, Teacher, SchoolEvent, Course, ClassAssignment, StudentAttendanceRecord } from './types';
+import { View, User, Student, Teacher, SchoolEvent, Course, ClassAssignment, StudentAttendanceRecord, Assessment, AttendanceRecord } from './types';
 import Header from './components/Header';
 import { NAVIGATION_ITEMS, TEACHER_NAVIGATION_ITEMS, STUDENT_NAVIGATION_ITEMS, EVENTS_DATA, STUDENTS_DATA, TEACHERS_DATA, COURSES_DATA, ASSESSMENTS_DATA } from './constants';
 import ClassManagement from './components/ClassManagement';
@@ -78,6 +78,7 @@ const App: React.FC = () => {
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isEditSchoolNameModalOpen, setIsEditSchoolNameModalOpen] = useState(false);
   const [printingStudent, setPrintingStudent] = useState<Student | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
 
   const [schoolName, setSchoolName] = useState<string>(() => {
     try {
@@ -115,7 +116,7 @@ const App: React.FC = () => {
     }
   });
 
-   const [assessments, setAssessments] = useState(() => {
+   const [assessments, setAssessments] = useState<Assessment[]>(() => {
     try {
         const saved = localStorage.getItem('assessments');
         return saved ? JSON.parse(saved) : ASSESSMENTS_DATA;
@@ -160,41 +161,14 @@ const App: React.FC = () => {
     }
   });
 
-  useEffect(() => {
-    localStorage.setItem('schoolName', JSON.stringify(schoolName));
-  }, [schoolName]);
-
-  useEffect(() => {
-    localStorage.setItem('students', JSON.stringify(students));
-  }, [students]);
-
-  useEffect(() => {
-    localStorage.setItem('teachers', JSON.stringify(teachers));
-  }, [teachers]);
-  
-  useEffect(() => {
-    localStorage.setItem('courses', JSON.stringify(courses));
-  }, [courses]);
-
-  useEffect(() => {
-    localStorage.setItem('assessments', JSON.stringify(assessments));
-  }, [assessments]);
-
-  useEffect(() => {
-    localStorage.setItem('events', JSON.stringify(events));
-  }, [events]);
-
-  useEffect(() => {
-    localStorage.setItem('reminders', JSON.stringify(reminders));
-  }, [reminders]);
-
-  useEffect(() => {
-    localStorage.setItem('classAssignments', JSON.stringify(classAssignments));
-  }, [classAssignments]);
-
-  useEffect(() => {
-    localStorage.setItem('studentAttendance', JSON.stringify(studentAttendance));
-  }, [studentAttendance]);
+  const [teacherAttendance, setTeacherAttendance] = useState<Record<string, AttendanceRecord[]>>(() => {
+    try {
+      const saved = localStorage.getItem('teacherAttendance');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
   useEffect(() => {
     try {
@@ -212,6 +186,41 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleSave = async (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        try {
+          localStorage.setItem('schoolName', JSON.stringify(schoolName));
+          localStorage.setItem('students', JSON.stringify(students));
+          localStorage.setItem('teachers', JSON.stringify(teachers));
+          localStorage.setItem('courses', JSON.stringify(courses));
+          localStorage.setItem('assessments', JSON.stringify(assessments));
+          localStorage.setItem('events', JSON.stringify(events));
+          localStorage.setItem('reminders', JSON.stringify(reminders));
+          localStorage.setItem('classAssignments', JSON.stringify(classAssignments));
+          localStorage.setItem('studentAttendance', JSON.stringify(studentAttendance));
+          localStorage.setItem('teacherAttendance', JSON.stringify(teacherAttendance));
+          setIsDirty(false);
+          resolve(true);
+        } catch (error) {
+          console.error("Failed to save data to localStorage:", error);
+          resolve(false);
+        }
+      }, 500);
+    });
+  };
+
+  const updateSchoolName = (newName: string) => { setSchoolName(newName); setIsDirty(true); };
+  const updateStudents = (updater: React.SetStateAction<Student[]>) => { setStudents(updater); setIsDirty(true); };
+  const updateTeachers = (updater: React.SetStateAction<Teacher[]>) => { setTeachers(updater); setIsDirty(true); };
+  const updateCourses = (updater: React.SetStateAction<Course[]>) => { setCourses(updater); setIsDirty(true); };
+  const updateAssessments = (updater: React.SetStateAction<Assessment[]>) => { setAssessments(updater); setIsDirty(true); };
+  const updateEvents = (updater: React.SetStateAction<SchoolEvent[]>) => { setEvents(updater); setIsDirty(true); };
+  const updateReminders = (updater: React.SetStateAction<number[]>) => { setReminders(updater); setIsDirty(true); };
+  const updateClassAssignments = (updater: React.SetStateAction<ClassAssignment>) => { setClassAssignments(updater); setIsDirty(true); };
+  const updateStudentAttendance = (updater: React.SetStateAction<StudentAttendanceRecord[]>) => { setStudentAttendance(updater); setIsDirty(true); };
+  const updateTeacherAttendance = (updater: React.SetStateAction<Record<string, AttendanceRecord[]>>) => { setTeacherAttendance(updater); setIsDirty(true); };
+
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('currentUser', JSON.stringify(user));
@@ -221,6 +230,11 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    if (isDirty) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to log out? Your changes will be lost.")) {
+        return;
+      }
+    }
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
   };
@@ -231,9 +245,9 @@ const App: React.FC = () => {
     const updatedUser = { ...currentUser, password: newPassword };
 
     if (currentUser.role === 'teacher') {
-        setTeachers(prevTeachers => prevTeachers.map(t => t.id === currentUser.id ? { ...t, password: newPassword } : t));
+        updateTeachers(prevTeachers => prevTeachers.map(t => t.id === currentUser.id ? { ...t, password: newPassword } : t));
     } else if (currentUser.role === 'student') {
-        setStudents(prevStudents => prevStudents.map(s => s.id === currentUser.id ? { ...s, password: newPassword } : s));
+        updateStudents(prevStudents => prevStudents.map(s => s.id === currentUser.id ? { ...s, password: newPassword } : s));
     }
     
     setCurrentUser(updatedUser);
@@ -242,7 +256,7 @@ const App: React.FC = () => {
   };
   
   const handleSchoolNameUpdate = (newName: string) => {
-    setSchoolName(newName);
+    updateSchoolName(newName);
     setIsEditSchoolNameModalOpen(false);
   };
 
@@ -289,19 +303,19 @@ const App: React.FC = () => {
         case View.Dashboard:
           return <Dashboard setCurrentView={setCurrentView} students={students} teachers={teachers} events={events} courses={courses} />;
         case View.Students:
-          return <Students currentUser={currentUser} students={students} setStudents={setStudents} onPrintRequest={handlePrintRequest} />;
+          return <Students currentUser={currentUser} students={students} setStudents={updateStudents} onPrintRequest={handlePrintRequest} />;
         case View.ClassManagement:
-          return <ClassManagement students={students} setStudents={setStudents} teachers={teachers} classAssignments={classAssignments} setClassAssignments={setClassAssignments} />;
+          return <ClassManagement students={students} setStudents={updateStudents} teachers={teachers} classAssignments={classAssignments} setClassAssignments={updateClassAssignments} />;
         case View.Teachers:
-          return <Teachers teachers={teachers} setTeachers={setTeachers} />;
+          return <Teachers teachers={teachers} setTeachers={updateTeachers} />;
         case View.Courses:
-          return <Courses currentUser={currentUser} teachers={teachers} courses={courses} setCourses={setCourses} />;
+          return <Courses currentUser={currentUser} teachers={teachers} courses={courses} setCourses={updateCourses} />;
         case View.Assessments:
-          return <Assessments currentUser={currentUser} students={students} assessments={assessments} setAssessments={setAssessments} courses={courses} />;
+          return <Assessments currentUser={currentUser} students={students} assessments={assessments} setAssessments={updateAssessments} courses={courses} />;
         case View.Attendance:
-          return <Attendance teachers={teachers} />;
+          return <Attendance teachers={teachers} allAttendance={teacherAttendance} setAllAttendance={updateTeacherAttendance} />;
         case View.Events:
-          return <Events events={events} setEvents={setEvents} reminders={reminders} setReminders={setReminders} />;
+          return <Events events={events} setEvents={updateEvents} reminders={reminders} setReminders={updateReminders} />;
         case View.ReportCardGenerator:
           return <ReportCardGenerator />;
         default:
@@ -312,11 +326,11 @@ const App: React.FC = () => {
         case View.TeacherDashboard:
           return <TeacherDashboard setCurrentView={setCurrentView} currentUser={currentUser} students={students} courses={courses} classAssignments={classAssignments} />;
         case View.Students:
-          return <Students currentUser={currentUser} students={students} setStudents={setStudents} onPrintRequest={handlePrintRequest} />;
+          return <Students currentUser={currentUser} students={students} setStudents={updateStudents} onPrintRequest={handlePrintRequest} />;
         case View.Courses:
-          return <Courses currentUser={currentUser} teachers={teachers} courses={courses} setCourses={setCourses} />;
+          return <Courses currentUser={currentUser} teachers={teachers} courses={courses} setCourses={updateCourses} />;
         case View.StudentAttendance:
-            return <StudentAttendance currentUser={currentUser} students={students} classAssignments={classAssignments} studentAttendance={studentAttendance} setStudentAttendance={setStudentAttendance} />;
+            return <StudentAttendance currentUser={currentUser} students={students} classAssignments={classAssignments} studentAttendance={studentAttendance} setStudentAttendance={updateStudentAttendance} />;
         case View.LessonPlanner:
             return <LessonPlanner />;
         default:
@@ -347,7 +361,9 @@ const App: React.FC = () => {
           onOpenEditSchoolNameModal={() => setIsEditSchoolNameModalOpen(true)}
           events={events}
           reminders={reminders}
-          setReminders={setReminders}
+          setReminders={updateReminders}
+          onSave={handleSave}
+          isDirty={isDirty}
         />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-100 p-6 md:p-8">
           {renderView()}

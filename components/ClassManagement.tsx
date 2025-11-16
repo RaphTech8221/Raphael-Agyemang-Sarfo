@@ -43,13 +43,15 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents
   const possibleGrades = [...Array(12).keys()].map(i => i + 1);
 
   const uniqueClasses = useMemo(() => {
-    const classMap = allStudents.reduce((acc, student) => {
+    // FIX: Add a generic type to `reduce` to ensure the accumulator `acc` and the resulting `classMap` are correctly typed.
+    // This resolves an issue where the parameters `a` and `b` in the subsequent `sort` function were inferred as `unknown`.
+    const classMap = allStudents.reduce<Record<string, { className: string, studentCount: number, grade: number }>>((acc, student) => {
         if (!acc[student.className]) {
             acc[student.className] = { className: student.className, studentCount: 0, grade: student.grade };
         }
         acc[student.className].studentCount++;
         return acc;
-    }, {} as Record<string, { className: string, studentCount: number, grade: number }>);
+    }, {});
     return Object.values(classMap).sort((a, b) => a.grade - b.grade || a.className.localeCompare(b.className));
   }, [allStudents]);
 
