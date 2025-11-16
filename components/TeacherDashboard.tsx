@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ASSESSMENTS_DATA } from '../constants';
-import { View, User, Student, Course } from '../types';
+import { View, User, Student, Course, ClassAssignment } from '../types';
 
 interface StatCardProps {
     icon: string;
@@ -14,13 +14,14 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color, onClick 
     const isClickable = !!onClick;
     const baseClasses = "bg-white p-6 rounded-xl shadow-md flex items-center w-full text-left transition-all duration-300";
     const clickableClasses = "cursor-pointer transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2";
+    const disabledClasses = "cursor-not-allowed opacity-75";
     const focusColor = color.replace('bg-', 'focus:ring-');
 
     return (
         <button
             onClick={onClick}
             disabled={!isClickable}
-            className={`${baseClasses} ${isClickable ? `${clickableClasses} ${focusColor}` : ''}`}
+            className={`${baseClasses} ${isClickable ? `${clickableClasses} ${focusColor}` : disabledClasses}`}
             aria-label={`View ${label}`}
         >
             <div className={`w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 ${color}`}>
@@ -39,9 +40,10 @@ interface TeacherDashboardProps {
     currentUser: User;
     students: Student[];
     courses: Course[];
+    classAssignments: ClassAssignment;
 }
 
-const TeacherDashboard: React.FC<TeacherDashboardProps> = ({setCurrentView, currentUser, students: allStudents, courses: allCourses}) => {
+const TeacherDashboard: React.FC<TeacherDashboardProps> = ({setCurrentView, currentUser, students: allStudents, courses: allCourses, classAssignments}) => {
 
   const courses = useMemo(() => {
     if (currentUser.role !== 'teacher') return [];
@@ -63,6 +65,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({setCurrentView, curr
     }
   }, [courses, allStudents]);
 
+  const assignedClass = useMemo(() => {
+    if(currentUser.role !== 'teacher') return null;
+    const entry = Object.entries(classAssignments).find(([_, teacherId]) => teacherId === currentUser.id);
+    return entry ? entry[0] : null;
+  }, [currentUser, classAssignments]);
+
 
   return (
     <div className="space-y-8">
@@ -72,9 +80,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({setCurrentView, curr
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard icon="fa-user-graduate" label="My Students" value={students.length} color="bg-sky-500" onClick={() => setCurrentView(View.Students)} />
         <StatCard icon="fa-book" label="My Courses" value={courses.length} color="bg-emerald-500" onClick={() => setCurrentView(View.Courses)} />
+        <StatCard icon="fa-user-check" label="Class Attendance" value={assignedClass ? `Class ${assignedClass}` : "Not Assigned"} color="bg-indigo-500" onClick={assignedClass ? () => setCurrentView(View.StudentAttendance) : undefined} />
       </div>
 
        <div className="bg-gradient-to-br from-slate-700 to-slate-900 text-white p-6 rounded-xl shadow-md flex flex-col items-center justify-center text-center">

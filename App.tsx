@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -12,12 +13,13 @@ import LessonPlanner from './components/LessonPlanner';
 import Login from './components/Login';
 import TeacherDashboard from './components/TeacherDashboard';
 import StudentDashboard from './components/StudentDashboard';
-import { View, User, Student, Teacher, SchoolEvent, Course } from './types';
+import { View, User, Student, Teacher, SchoolEvent, Course, ClassAssignment, StudentAttendanceRecord } from './types';
 import Header from './components/Header';
 import { NAVIGATION_ITEMS, TEACHER_NAVIGATION_ITEMS, STUDENT_NAVIGATION_ITEMS, EVENTS_DATA, STUDENTS_DATA, TEACHERS_DATA, COURSES_DATA, ASSESSMENTS_DATA } from './constants';
 import ClassManagement from './components/ClassManagement';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import PrintableReport from './components/PrintableReport';
+import StudentAttendance from './components/StudentAttendance';
 
 
 const EditSchoolNameModal: React.FC<{
@@ -140,6 +142,24 @@ const App: React.FC = () => {
     }
   });
 
+  const [classAssignments, setClassAssignments] = useState<ClassAssignment>(() => {
+    try {
+      const saved = localStorage.getItem('classAssignments');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [studentAttendance, setStudentAttendance] = useState<StudentAttendanceRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('studentAttendance');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   useEffect(() => {
     localStorage.setItem('schoolName', JSON.stringify(schoolName));
   }, [schoolName]);
@@ -167,6 +187,14 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('reminders', JSON.stringify(reminders));
   }, [reminders]);
+
+  useEffect(() => {
+    localStorage.setItem('classAssignments', JSON.stringify(classAssignments));
+  }, [classAssignments]);
+
+  useEffect(() => {
+    localStorage.setItem('studentAttendance', JSON.stringify(studentAttendance));
+  }, [studentAttendance]);
 
   useEffect(() => {
     try {
@@ -226,6 +254,18 @@ const App: React.FC = () => {
   if (!currentUser) {
     return <Login onLogin={handleLogin} schoolName={schoolName} />;
   }
+  
+  if (currentView === View.PrintReport && printingStudent) {
+    return (
+      <PrintableReport
+        student={printingStudent}
+        schoolName={schoolName}
+        assessments={assessments}
+        courses={courses}
+        onBack={() => setCurrentView(View.Students)}
+      />
+    );
+  }
 
   let navItems;
   if (currentUser.role === 'admin') navItems = NAVIGATION_ITEMS;
@@ -237,8 +277,6 @@ const App: React.FC = () => {
   let title = 'Dashboard';
   if (currentNavItem) {
       title = currentNavItem.label;
-  } else if (currentView === View.PrintReport) {
-      title = 'Student Report Card';
   } else {
       if (currentUser.role === 'admin') title = 'Dashboard';
       else if (currentUser.role === 'teacher') title = 'My Dashboard';
@@ -253,7 +291,7 @@ const App: React.FC = () => {
         case View.Students:
           return <Students currentUser={currentUser} students={students} setStudents={setStudents} onPrintRequest={handlePrintRequest} />;
         case View.ClassManagement:
-          return <ClassManagement students={students} setStudents={setStudents} />;
+          return <ClassManagement students={students} setStudents={setStudents} teachers={teachers} classAssignments={classAssignments} setClassAssignments={setClassAssignments} />;
         case View.Teachers:
           return <Teachers teachers={teachers} setTeachers={setTeachers} />;
         case View.Courses:
@@ -266,25 +304,23 @@ const App: React.FC = () => {
           return <Events events={events} setEvents={setEvents} reminders={reminders} setReminders={setReminders} />;
         case View.ReportCardGenerator:
           return <ReportCardGenerator />;
-        case View.PrintReport:
-          return printingStudent && <PrintableReport student={printingStudent} schoolName={schoolName} assessments={assessments} courses={courses} onBack={() => setCurrentView(View.Students)} />;
         default:
           return <Dashboard setCurrentView={setCurrentView} students={students} teachers={teachers} events={events} courses={courses} />;
       }
     } else if (currentUser.role === 'teacher') { // Teacher view
       switch (currentView) {
         case View.TeacherDashboard:
-          return <TeacherDashboard setCurrentView={setCurrentView} currentUser={currentUser} students={students} courses={courses} />;
+          return <TeacherDashboard setCurrentView={setCurrentView} currentUser={currentUser} students={students} courses={courses} classAssignments={classAssignments} />;
         case View.Students:
           return <Students currentUser={currentUser} students={students} setStudents={setStudents} onPrintRequest={handlePrintRequest} />;
         case View.Courses:
           return <Courses currentUser={currentUser} teachers={teachers} courses={courses} setCourses={setCourses} />;
+        case View.StudentAttendance:
+            return <StudentAttendance currentUser={currentUser} students={students} classAssignments={classAssignments} studentAttendance={studentAttendance} setStudentAttendance={setStudentAttendance} />;
         case View.LessonPlanner:
             return <LessonPlanner />;
-        case View.PrintReport:
-            return printingStudent && <PrintableReport student={printingStudent} schoolName={schoolName} assessments={assessments} courses={courses} onBack={() => setCurrentView(View.Students)} />;
         default:
-          return <TeacherDashboard setCurrentView={setCurrentView} currentUser={currentUser} students={students} courses={courses} />;
+          return <TeacherDashboard setCurrentView={setCurrentView} currentUser={currentUser} students={students} courses={courses} classAssignments={classAssignments} />;
       }
     } else if (currentUser.role === 'student') {
         switch(currentView) {
@@ -300,13 +336,11 @@ const App: React.FC = () => {
     }
   };
   
-  const showSidebarAndHeader = currentView !== View.PrintReport;
-
   return (
     <div className="flex h-screen bg-slate-100 font-sans">
-      {showSidebarAndHeader && <Sidebar currentView={currentView} setCurrentView={setCurrentView} onLogout={handleLogout} currentUser={currentUser} schoolName={schoolName} />}
+      <Sidebar currentView={currentView} setCurrentView={setCurrentView} onLogout={handleLogout} currentUser={currentUser} schoolName={schoolName} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        {showSidebarAndHeader && <Header 
+        <Header 
           title={title} 
           currentUser={currentUser} 
           onOpenChangePasswordModal={() => setIsChangePasswordModalOpen(true)}
@@ -314,7 +348,7 @@ const App: React.FC = () => {
           events={events}
           reminders={reminders}
           setReminders={setReminders}
-        />}
+        />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-100 p-6 md:p-8">
           {renderView()}
         </main>

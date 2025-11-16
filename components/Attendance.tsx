@@ -65,15 +65,18 @@ const Attendance: React.FC<AttendanceProps> = ({ teachers }) => {
 
   const handleCheckIn = (teacherId: string) => {
     setAttendance(prev =>
-      prev.map(record =>
-        record.teacherId === teacherId
-          ? {
+      prev.map(record => {
+        if (record.teacherId === teacherId) {
+            const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            return {
               ...record,
               status: 'Present',
-              checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-            }
-          : record
-      )
+              checkInTime: record.checkInTime || now, // Keep original check-in time if re-checking in
+              checkOutTime: null, // Clear checkout time on re-check-in
+            };
+        }
+        return record;
+      })
     );
   };
 
@@ -116,11 +119,39 @@ const Attendance: React.FC<AttendanceProps> = ({ teachers }) => {
     }
   };
 
+  const attendanceSummary = useMemo(() => {
+    return attendance.reduce((acc, record) => {
+        if (record.status === 'Present') acc.Present++;
+        else if (record.status === 'Absent') acc.Absent++;
+        else if (record.status === 'Checked Out') acc.CheckedOut++;
+        return acc;
+    }, { Present: 0, Absent: 0, CheckedOut: 0 });
+  }, [attendance]);
+
+
   return (
     <div className="bg-white p-6 md:p-8 rounded-xl shadow-md">
       <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
         <h3 className="text-xl font-bold text-slate-700">Teacher Attendance Log</h3>
         <p className="text-sm text-slate-500">Today's Date: {new Date().toLocaleDateString()}</p>
+      </div>
+      
+      <div className="bg-slate-50 p-4 rounded-lg flex flex-wrap justify-between items-center gap-4 mb-6 border border-slate-200">
+        <div className="flex items-center gap-x-6 gap-y-2 flex-wrap text-sm">
+            <span className="font-semibold text-slate-700">Daily Summary:</span>
+            <span className="text-green-600 font-medium flex items-center">
+                <i className="fa-solid fa-check-circle mr-1.5"></i>
+                Present: {attendanceSummary.Present}
+            </span>
+            <span className="text-red-600 font-medium flex items-center">
+                 <i className="fa-solid fa-times-circle mr-1.5"></i>
+                Absent: {attendanceSummary.Absent}
+            </span>
+            <span className="text-slate-600 font-medium flex items-center">
+                <i className="fa-solid fa-arrow-right-from-bracket mr-1.5"></i>
+                Checked Out: {attendanceSummary.CheckedOut}
+            </span>
+        </div>
       </div>
 
       {/* Filters */}
@@ -187,7 +218,7 @@ const Attendance: React.FC<AttendanceProps> = ({ teachers }) => {
                 <td className="px-6 py-4 text-center space-x-2">
                   <button
                     onClick={() => handleCheckIn(record.teacherId)}
-                    disabled={record.status !== 'Absent'}
+                    disabled={record.status === 'Present'}
                     className="font-medium text-white bg-green-500 hover:bg-green-600 px-3 py-1 rounded-lg text-xs disabled:bg-slate-300 disabled:cursor-not-allowed transition"
                   >
                     Check In

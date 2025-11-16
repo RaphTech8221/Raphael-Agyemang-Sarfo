@@ -11,7 +11,8 @@ export enum View {
   StudentDashboard,
   ClassManagement,
   Events,
-  PrintReport
+  PrintReport,
+  StudentAttendance
 }
 
 export interface Student {
@@ -97,4 +98,12 @@ export interface SchoolEvent {
   date: string;
   description: string;
   category: 'Academic' | 'Sports' | 'Arts' | 'Community';
+}
+
+export type ClassAssignment = Record<string, string>; // {[className]: teacherId}
+
+export interface StudentAttendanceRecord {
+  studentId: string;
+  date: string;
+  status: 'Present' | 'Absent' | 'Late';
 }

@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Student } from '../types';
+import { Student, Teacher, ClassAssignment } from '../types';
 
 interface ClassManagementProps {
   students: Student[];
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
+  teachers: Teacher[];
+  classAssignments: ClassAssignment;
+  setClassAssignments: React.Dispatch<React.SetStateAction<ClassAssignment>>;
 }
 
-const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents, setStudents: setAllStudents }) => {
+const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents, setStudents: setAllStudents, teachers, classAssignments, setClassAssignments }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [targetGrade, setTargetGrade] = useState<number | string>('');
@@ -39,6 +42,17 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents
   const sortedGrades = useMemo(() => Object.keys(studentsByGradeAndClass).map(Number).sort((a, b) => a - b), [studentsByGradeAndClass]);
   const possibleGrades = [...Array(12).keys()].map(i => i + 1);
 
+  const uniqueClasses = useMemo(() => {
+    const classMap = allStudents.reduce((acc, student) => {
+        if (!acc[student.className]) {
+            acc[student.className] = { className: student.className, studentCount: 0, grade: student.grade };
+        }
+        acc[student.className].studentCount++;
+        return acc;
+    }, {} as Record<string, { className: string, studentCount: number, grade: number }>);
+    return Object.values(classMap).sort((a, b) => a.grade - b.grade || a.className.localeCompare(b.className));
+  }, [allStudents]);
+
   const handleOpenModal = (student: Student) => {
     setSelectedStudent(student);
     setTargetGrade(student.grade);
@@ -62,6 +76,19 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents
       );
       handleCloseModal();
     }
+  };
+
+  const handleAssignTeacher = (className: string, teacherId: string) => {
+    setClassAssignments(prev => {
+        const newAssignments = {...prev};
+        if (teacherId === "") {
+            // Unassign if "Select Teacher" is chosen
+            delete newAssignments[className];
+        } else {
+            newAssignments[className] = teacherId;
+        }
+        return newAssignments;
+    });
   };
 
   const toggleGradeExpansion = (grade: number) => {
@@ -201,16 +228,67 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents
 
 
   return (
-    <>
+    <div className="space-y-8">
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-md">
+        <h3 className="text-xl font-bold text-slate-700 mb-4">Class Teacher Assignments</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-slate-500">
+            <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+              <tr>
+                <th scope="col" className="px-6 py-3">Class</th>
+                <th scope="col" className="px-6 py-3">Assigned Teacher</th>
+                <th scope="col" className="px-6 py-3">Assign / Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              {uniqueClasses.map(({ className, grade }) => {
+                const assignedTeacherId = classAssignments[className];
+                const assignedTeacher = teachers.find(t => t.id === assignedTeacherId);
+                return (
+                  <tr key={className} className="bg-white border-b hover:bg-slate-50">
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      Class {className} <span className="text-xs text-slate-500">(Grade {grade})</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {assignedTeacher ? (
+                        <div className="flex items-center">
+                          <img src={assignedTeacher.imageUrl} alt={assignedTeacher.name} className="w-8 h-8 rounded-full object-cover mr-3" />
+                          <span>{assignedTeacher.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">Not Assigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <select
+                        value={assignedTeacherId || ''}
+                        onChange={(e) => handleAssignTeacher(className, e.target.value)}
+                        className="w-full sm:w-48 px-4 py-2 border border-slate-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition appearance-none pr-8 bg-white"
+                        aria-label={`Assign teacher for Class ${className}`}
+                      >
+                        <option value="">-- Select Teacher --</option>
+                        {teachers.map(teacher => (
+                          <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
       <div className="bg-white p-6 md:p-8 rounded-xl shadow-md">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <h3 className="text-xl font-bold text-slate-700">Class & Grade Management</h3>
+          <h3 className="text-xl font-bold text-slate-700">Student Class Assignments</h3>
           <button
             onClick={handleOpenImportModal}
             className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center"
           >
             <i className="fa-solid fa-file-csv mr-2"></i>
-            Bulk Import Assignments
+            Bulk Re-assign Students
           </button>
         </div>
         <div className="space-y-2">
@@ -362,7 +440,7 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents
                   .animate-fade-in-up { animation: fade-in-up 0.3s ease-out forwards; }
                 `}</style>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-2xl font-bold text-slate-800">Bulk Import Assignments</h3>
+                    <h3 className="text-2xl font-bold text-slate-800">Bulk Re-assign Students</h3>
                     <button onClick={handleCloseImportModal} className="text-slate-400 hover:text-slate-600 focus:outline-none">
                         <i className="fa-solid fa-times text-2xl"></i>
                     </button>
@@ -421,7 +499,7 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ students: allStudents
             </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

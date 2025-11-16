@@ -41,6 +41,9 @@ const Students: React.FC<StudentsProps> = ({ currentUser, students: allStudents,
     address: '',
     guardianPhone: '',
   });
+  
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
 
   const isPrivilegedUser = currentUser.role === 'admin' || currentUser.role === 'teacher';
   const isAdmin = currentUser.role === 'admin';
@@ -109,6 +112,23 @@ const Students: React.FC<StudentsProps> = ({ currentUser, students: allStudents,
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+  };
+  
+  const handleOpenDeleteModal = (student: Student) => {
+    setStudentToDelete(student);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setStudentToDelete(null);
+    setIsDeleteModalOpen(false);
+  };
+  
+  const handleConfirmDelete = () => {
+    if (studentToDelete) {
+      setAllStudents(prevStudents => prevStudents.filter(s => s.id !== studentToDelete.id));
+      handleCloseDeleteModal();
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -281,7 +301,10 @@ const Students: React.FC<StudentsProps> = ({ currentUser, students: allStudents,
                           <i className="fa-solid fa-print mr-1"></i>Report
                         </button>
                         {isAdmin && (
-                          <button onClick={(e) => { e.preventDefault(); handleOpenEditModal(student); }} className="font-medium text-sky-600 hover:underline">Edit</button>
+                          <>
+                            <button onClick={(e) => { e.preventDefault(); handleOpenEditModal(student); }} className="font-medium text-sky-600 hover:underline">Edit</button>
+                            <button onClick={() => handleOpenDeleteModal(student)} className="font-medium text-red-600 hover:underline">Delete</button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -450,6 +473,47 @@ const Students: React.FC<StudentsProps> = ({ currentUser, students: allStudents,
                   <button type="submit" className="px-6 py-2 rounded-lg text-white bg-sky-500 hover:bg-sky-600 transition font-semibold focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-opacity-75">{isEditMode ? 'Save Changes' : 'Add Student'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isDeleteModalOpen && studentToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" aria-modal="true" role="dialog">
+          <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md m-4 transform transition-all duration-300 ease-out animate-fade-in-up">
+            <style>{`
+              @keyframes fade-in-up {
+                0% { opacity: 0; transform: translateY(20px); }
+                100% { opacity: 1; transform: translateY(0); }
+              }
+              .animate-fade-in-up { animation: fade-in-up 0.3s ease-out forwards; }
+            `}</style>
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <i className="fa-solid fa-triangle-exclamation text-2xl text-red-600"></i>
+              </div>
+              <h3 className="text-lg leading-6 font-bold text-slate-900 mt-5">Delete Student</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-slate-500">
+                  Are you sure you want to delete <span className="font-semibold">{studentToDelete.name}</span>? This action is permanent and cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center mt-6 space-x-4">
+                <button
+                  type="button"
+                  onClick={handleCloseDeleteModal}
+                  className="px-6 py-2 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="px-6 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 transition font-semibold"
+                >
+                  Delete Student
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

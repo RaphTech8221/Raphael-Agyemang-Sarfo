@@ -72,6 +72,7 @@ export const NAVIGATION_ITEMS = [
 export const TEACHER_NAVIGATION_ITEMS = [
   { icon: 'fa-solid fa-house', label: 'Dashboard', view: View.TeacherDashboard },
   { icon: 'fa-solid fa-user-graduate', label: 'My Students', view: View.Students },
+  { icon: 'fa-solid fa-user-check', label: 'Class Attendance', view: View.StudentAttendance },
   { icon: 'fa-solid fa-book', label: 'My Courses', view: View.Courses },
   { icon: 'fa-solid fa-lightbulb', label: 'AI Lesson Planner', view: View.LessonPlanner },
 ];
